@@ -21,8 +21,6 @@ type tile = Mur |  Vide| Allie of entite | Ennemi of entite
 
 let cases = "##################################-------################-----------############---------------#########-----------------#######-------------------######-------------------#####---------------------####---------------------###-----------------------##-----------------------##-----------------------##-----------------------##-----------------------##-----------------------##-----------------------###---------------------####---------------------#####-------------------######-------------------#######-----------------#########---------------############-----------################-------##################################"
 
-
-
 let map_create () = Array.make_matrix 25 25 Vide
 
 let _ =
@@ -134,6 +132,8 @@ done
 
 
 
+    
+
 let _ =
     attroff(A.color);
     let h = match get_size ()with (x,_) -> x in
@@ -142,6 +142,47 @@ let _ =
     let w = h in
     let t_x = ref (w/2) in
     let t_y = ref (h/2) in
-	
-	ligne_horiz vert_clair 0 50 25
-	endwin ()
+
+    (* boucle principale *)
+    while !continue do
+        (* le clear permet de ne pas avoir de problèmes avec les animations
+           mais c'est lent. Dans beaucoup d'application il vaut mieux
+           réecrire par dessus ce qui a changé *)
+        clear ();
+        let m = mapofstring cases in
+        draw_board m h;
+
+
+
+        (* on écrit un texte qui peut se déplacer avec
+           les fléches *)
+        couleur blanc noir;
+        ignore (mvaddstr !t_y !t_x (Printf.sprintf "Texte en %dx%d a deplacer avec les fleches" !t_x !t_y));
+
+        incr frames;
+
+        (* on attend un peu 1/10s *)
+        Unix.sleepf 0.05;
+        (* on rafraichit l'écran *)
+        assert(refresh ());
+
+        (* on regarde si on a appuyé sur une touche *)
+        let c = getch () in
+        if c >= 0
+        then begin
+            (* c'est le cas on fait une action en conséquence *)
+            (* attention certaines touches sont spéciales et ne
+               peuvent pas être converties en caractère comme les
+               touches fléchées *)
+            if c = Key.down then t_y := min (!t_y+1) (h-2)
+            else if c = Key.up then t_y := max (!t_y-1) 1
+            else if c = Key.left then t_x := max (!t_x-1) 1 
+            else if c = Key.right then t_x := min (!t_x+1) (w-2)
+            else (match char_of_int c with
+                (* des caractères normaux *)
+                | 'q' -> continue := false
+                | _ -> ())
+        end
+    done;
+
+    endwin ()

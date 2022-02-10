@@ -1,0 +1,3 @@
+(executable
+    (name exemple)
+    (libraries curses unix))

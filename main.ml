@@ -1,7 +1,12 @@
 open Curses
 
 
-type attaque = Nulle | Existe of string * (int*int) list
+type skill = {
+	name : string;
+	description: string;
+	range : (int*int) list
+	}
+type attaque = Nulle | Existe of skill
 
 type entite = {
     mutable mpmax : int;
@@ -144,6 +149,33 @@ let draw_UI_main ent cursor =
     if cursor = 1 then putpixel rouge_clair 3 45 else putpixel rouge_clair 3 50
 
 
+
+let draw_skill_range (n,v)  skill=
+	let rec aux_draw_skill_range (n,v) l =
+	match l with 
+	|[] -> []
+	|(x,y)::q -> begin putpixel blanc (n+x) (v+y); aux_draw_skill_range (n,v) q end
+in
+	aux_draw_skill_range (n,v) skill.range
+
+
+let draw_UI_Attaques ent =
+	let draw_skill x y skill = 
+	match skill with
+	|Nulle -> ignore (mvaddstr x y (Printf.sprintf "" ));
+	|Existe s ->begin
+			    ignore (mvaddstr x y (Printf.sprintf s.name ));
+			    mvaddstr (x+5) (y+1) (Printf.sprintf s.description )
+			end
+			in
+	match ent.skills with
+	|a,b,c,d -> begin 
+				draw_skill 5 30 a;
+				draw_skill 15 30 b;
+				draw_skill 25 30 c;
+				draw_skill 35 30 d
+end
+	
 
 
 

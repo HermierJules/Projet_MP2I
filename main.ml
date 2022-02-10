@@ -33,6 +33,8 @@ let _ =
 
 (*
 let a   = {
+	hpmax = 15;
+	mpmax = 10;
     hp = 5;
     mp = 2;
     pos =(0,0);
@@ -90,7 +92,7 @@ let paires =
 
 
 
-let couleur texte fond =
+let couleur texte  fond =
     attron (A.color_pair paires.(texte).(fond))
 
 
@@ -123,12 +125,27 @@ let draw_board m h =
             for i = 0 to mult-1 do 
                      match m.(y).(x) with
                      |Vide -> putpixel noir (x+i) (y+i)
-                     |Mur -> putpixel  gris (x+i) (y+i)
+                     |Mur -> putpixel  vert_clair (x+i) (y+i)
                      | Ennemi _-> putpixel rouge (x+i) (y+i)
                      |Allie _-> putpixel vert_clair (x+i) (y+i) 
          done
     done
 done
+
+(*let's draw the UI*)
+
+let draw_UI_main ent cursor =
+	couleur blanc noir;
+    ignore (mvaddstr 5 30 (Printf.sprintf "HP: %d/%d" ent.hp ent.hpmax));
+    ignore (mvaddstr 10 30 (Printf.sprintf "HP: %d/%d" ent.mp ent.mpmax));
+    ignore (mvaddstr 15 40 (Printf.sprintf "Que faire ? :"));
+    ignore (mvaddstr 20 30 (Printf.sprintf "Attaquer :"));
+    ignore (mvaddstr 25 30 (Printf.sprintf "se déplacer :"));
+    if cursor = 1 then putpixel rouge_clair 3 45 else putpixel rouge_clair 3 50
+
+
+
+
 
 
 
@@ -149,6 +166,7 @@ let _ =
            mais c'est lent. Dans beaucoup d'application il vaut mieux
            réecrire par dessus ce qui a changé *)
         clear ();
+        couleur rouge noir;
         let m = mapofstring cases in
         draw_board m h;
 

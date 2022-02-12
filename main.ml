@@ -24,6 +24,25 @@ type tile = Mur |  Vide| Allie of entite | Ennemi of entite
 
 (*definitions*)
 
+let pathfinder x1 y1 x2 y2 =
+    let dist x1 y1 x2 y2 =
+        let distance = Float.sqrt ((float_of_int ((x1-x2)*(x1-x2)))+.(float_of_int ((y1-y2)*(y1-y2)))) in
+        distance
+    in
+    let x = ref x1 and y = ref y1 in
+    while (dist !x !y x2 y2) >= (dist x1 y1 x2 y2) do
+        x := x1;
+        y := y1;
+        let move = Random.int 4 in
+        if move = 0 then x := !x+1
+        else if move = 1 then x := !x-1
+        else if move = 2 then y := !y+1
+        else if move = 3 then y := !y-1
+    done;
+    (!x,!y)
+
+
+
 let cases = "##################################-------################-----------############---------------#########-----------------#######-------------------######-------------------#####---------------------####---------------------###-----------------------##-----------------------##-----------------------##-----------------------##-----------------------##-----------------------##-----------------------###---------------------####---------------------#####-------------------######-------------------#######-----------------#########---------------############-----------################-------##################################"
 
 let map_create () = Array.make_matrix 25 25 Vide
@@ -139,6 +158,7 @@ done
 
 (*let's draw the UI*)
 
+
 let draw_UI_main ent cursor =
 	couleur blanc noir;
     ignore (mvaddstr 5 30 (Printf.sprintf "HP: %d/%d" ent.hp ent.hpmax));
@@ -184,6 +204,8 @@ end
     
 
 let _ =
+Random.self_init ();
+
     attroff(A.color);
     let h = match get_size ()with (x,_) -> x in
         let continue = ref true in

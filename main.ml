@@ -130,8 +130,22 @@ let draw_board m h =
     done
 done
 
-
-
+let pathfinder x1 y1 x2 y2 =
+	let dist x1 y1 x2 y2 =
+		let distance = Float.sqrt ((float_of_int ((x1-x2)*(x1-x2)))+.(float_of_int ((y1-y2)*(y1-y2)))) in
+		distance
+	in
+	let x = ref x1 and y = ref y1 in
+	while (dist !x !y x2 y2) >= (dist x1 y1 x2 y2) do
+		x := x1;
+		y := y1;
+		let move = Random.int 4 in
+		if move = 0 then x := !x+1
+		else if move = 1 then x := !x-1
+		else if move = 2 then y := !y+1
+		else if move = 3 then y := !y-1
+	done;
+	(!x,!y)
     
 
 let _ =
@@ -142,7 +156,8 @@ let _ =
     let w = h in
     let t_x = ref (w/2) in
     let t_y = ref (h/2) in
-
+	
+	Random.self_init ();
     (* boucle principale *)
     while !continue do
         (* le clear permet de ne pas avoir de problèmes avec les animations
@@ -184,5 +199,5 @@ let _ =
                 | _ -> ())
         end
     done;
-
+	
     endwin ()

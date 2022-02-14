@@ -15,7 +15,8 @@ type entite = {
     mutable mp: int;
     mutable x: int;
 	mutable y: int;
-    mutable skills: attaque * attaque * attaque * attaque
+    mutable skills: attaque * attaque * attaque * attaque;
+	mutable can_move: bool
 }
 
 type tile = Mur |  Vide| Allie of entite | Ennemi of entite 
@@ -87,7 +88,8 @@ let a   = {
     mp = 2;
     x = 9;
 	y = 9;
-    skills= (Existe blast_skill,Existe ray_skill,Existe slash_skill,Existe healAura_skill)
+    skills= (Existe blast_skill,Existe ray_skill,Existe slash_skill,Existe healAura_skill);
+	can_move = false;
 }
 
 (*définitions des couleurs*)
@@ -176,7 +178,7 @@ let draw_board m h =
                      |Vide -> putpixel noir (x+i) (y+i)
                      |Mur -> putpixel  gris (x+i) (y+i)
                      | Ennemi _-> putpixel rouge (x+i) (y+i)
-                     |Allie _-> putpixel vert (x+i) (y+i) 
+                     |Allie a-> if a.can_move then putpixel vert (x+i) (y+i) else putpixel vert_clair (x+i) (y+i)
          done
     done
 done
@@ -187,10 +189,10 @@ done
 let draw_UI_main ent cursor =
 	couleur blanc noir;
     ignore (mvaddstr 5 30 (Printf.sprintf "HP: %d/%d" ent.hp ent.hpmax));
-    ignore (mvaddstr 10 30 (Printf.sprintf "HP: %d/%d" ent.mp ent.mpmax));
-    ignore (mvaddstr 15 40 (Printf.sprintf "Que faire ? :"));
-    ignore (mvaddstr 20 30 (Printf.sprintf "Attaquer :"));
-    ignore (mvaddstr 25 30 (Printf.sprintf "se déplacer :"));
+    ignore (mvaddstr 5 50 (Printf.sprintf "MP: %d/%d" ent.mp ent.mpmax));
+    ignore (mvaddstr 10 35 (Printf.sprintf "Que faire ? :"));
+    ignore (mvaddstr 15 30 (Printf.sprintf "Attaquer :    A"));
+    ignore (mvaddstr 18 30 (Printf.sprintf "Se deplacer : M"));
     if cursor = 1 then putpixel rouge_clair 3 45 else putpixel rouge_clair 3 50
 
 
@@ -199,7 +201,7 @@ let draw_skill_range (n,v)  skill=
 	let rec aux_draw_skill_range (n,v) l =
 	match l with 
 	|[] -> []
-	|(x,y)::q -> begin putpixel vert_clair (n+x) (v+y); aux_draw_skill_range (n,v) q end
+	|(x,y)::q -> begin putpixel blanc (n+x) (v+y); aux_draw_skill_range (n,v) q end
 in
 	ignore (aux_draw_skill_range (n,v) skill.range)
 
@@ -222,10 +224,11 @@ let draw_UI_Attaques ent =
 end
 	
 let move_entite map ent dx dy =
-	if map.(ent.y+dy).(ent.x+dx) = Vide then begin
-		ent.x <- ent.x + dx;
-		ent.y <- ent.y + dy;
-	end
+	if ent.can_move then
+		if map.(ent.y+dy).(ent.x+dx) = Vide then begin
+			ent.x <- ent.x + dx;
+			ent.y <- ent.y + dy;
+		end
 	
 
 
@@ -261,7 +264,7 @@ Random.self_init ();
 		draw_skill_range (13,6) healAura_skill;
 		
 		couleur blanc noir;
-		draw_UI_Attaques a;
+		draw_UI_main a 1;
         (* on écrit un texte qui peut se déplacer avec
            les fléches *)
         (*couleur blanc noir;
@@ -289,6 +292,7 @@ Random.self_init ();
             else (match char_of_int c with
                 (* des caractères normaux *)
                 | 'q' -> continue := false
+				| 'm' -> a.can_move <- (not a.can_move)
                 | _ -> ())
         end
     done;

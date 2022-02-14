@@ -58,25 +58,25 @@ let _ =
 
 let blast_skill = {
 	name = "Explosion";
-	description = "Attaque autour du personnage (Portée: 2)";
+	description = "Attaque autour du personnage (Portee: 2)";
 	range = [(-2,0);(-1,-1);(-1,0);(-1,1);(0,-2);(0,-1);(0,1);(0,2);(1,-1);(1,0);(1,1);(2,0)]
 }
 
 let ray_skill = {
 	name = "Rayon";
-	description = "Attaque droit devant le personnage (Portée: 5)";
+	description = "Attaque droit devant le personnage (Portee: 5)";
 	range = [(1,0);(2,0);(3,0);(4,0);(5,0)]
 }
 
 let slash_skill = {
 	name = "Taillade";
-	description = "Coup devant le personnage (Portée: 1)";
+	description = "Coup devant le personnage (Portee: 1)";
 	range = [(1,-1);(1,0);(1,1)]
 }
 
 let healAura_skill = {
 	name = "Aura de Soin";
-	description = "Soin autour du personnage (Portée: 2)";
+	description = "Soin autour du personnage (Portee: 2)";
 	range = [(-2,0);(-1,-1);(-1,0);(-1,1);(0,-2);(0,-1);(0,1);(0,2);(1,-1);(1,0);(1,1);(2,0)]
 }
 
@@ -210,7 +210,7 @@ let draw_UI_Attaques ent =
 	|Nulle -> ignore (mvaddstr x y (Printf.sprintf "" ));
 	|Existe s ->begin
 			    ignore (mvaddstr x y (Printf.sprintf "%s" s.name));
-			    ignore(mvaddstr (x+5) (y+1) (Printf.sprintf "%s" s.description ))
+			    ignore(mvaddstr (x+3) (y+1) (Printf.sprintf "%s" s.description ))
 			end
 			in
 	match ent.skills with
@@ -221,7 +221,12 @@ let draw_UI_Attaques ent =
 				draw_skill 35 30 d
 end
 	
-
+let move_entite map ent dx dy =
+	if map.(ent.y+dy).(ent.x+dx) = Vide then begin
+		ent.x <- ent.x + dx;
+		ent.y <- ent.y + dy;
+	end
+	
 
 
 
@@ -254,7 +259,9 @@ Random.self_init ();
 		draw_skill_range (7,10) ray_skill;
 		draw_skill_range (15,15) slash_skill;
 		draw_skill_range (13,6) healAura_skill;
-
+		
+		couleur blanc noir;
+		draw_UI_Attaques a;
         (* on écrit un texte qui peut se déplacer avec
            les fléches *)
         (*couleur blanc noir;
@@ -275,10 +282,10 @@ Random.self_init ();
             (* attention certaines touches sont spéciales et ne
                peuvent pas être converties en caractère comme les
                touches fléchées *)
-            if c = Key.down then a.y <- a.y + 1
-            else if c = Key.up then a.y <- a.y - 1
-            else if c = Key.left then a.x <- a.x - 1 
-            else if c = Key.right then a.x <- a.x + 1
+            if c = Key.down then move_entite m a 0 1
+            else if c = Key.up then move_entite m a 0 (-1)
+            else if c = Key.left then move_entite m a (-1) 0 
+            else if c = Key.right then move_entite m a 1 0
             else (match char_of_int c with
                 (* des caractères normaux *)
                 | 'q' -> continue := false

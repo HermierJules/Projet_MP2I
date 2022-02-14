@@ -13,7 +13,8 @@ type entite = {
     mutable hpmax : int;
     mutable hp :  int;
     mutable mp: int;
-    mutable pos: int * int;
+    mutable x: int;
+	mutable y: int;
     mutable skills: attaque * attaque * attaque * attaque
 }
 
@@ -56,8 +57,26 @@ let _ =
     assert (noecho ())
 
 let blast_skill = {
-	name = "Blast";
-	description = "Attaque autour du personnage dans un rayon de 2";
+	name = "Explosion";
+	description = "Attaque autour du personnage (Portée: 2)";
+	range = [(-2,0);(-1,-1);(-1,0);(-1,1);(0,-2);(0,-1);(0,1);(0,2);(1,-1);(1,0);(1,1);(2,0)]
+}
+
+let ray_skill = {
+	name = "Rayon";
+	description = "Attaque droit devant le personnage (Portée: 5)";
+	range = [(1,0);(2,0);(3,0);(4,0);(5,0)]
+}
+
+let slash_skill = {
+	name = "Taillade";
+	description = "Coup devant le personnage (Portée: 1)";
+	range = [(1,-1);(1,0);(1,1)]
+}
+
+let healAura_skill = {
+	name = "Aura de Soin";
+	description = "Soin autour du personnage (Portée: 2)";
 	range = [(-2,0);(-1,-1);(-1,0);(-1,1);(0,-2);(0,-1);(0,1);(0,2);(1,-1);(1,0);(1,1);(2,0)]
 }
 
@@ -66,8 +85,9 @@ let a   = {
 	mpmax = 10;
     hp = 5;
     mp = 2;
-    pos =(0,0);
-    skills= (Existe blast_skill,Nulle,Nulle,Nulle)
+    x = 9;
+	y = 9;
+    skills= (Existe blast_skill,Existe ray_skill,Existe slash_skill,Existe healAura_skill)
 }
 
 (*définitions des couleurs*)
@@ -156,7 +176,7 @@ let draw_board m h =
                      |Vide -> putpixel noir (x+i) (y+i)
                      |Mur -> putpixel  gris (x+i) (y+i)
                      | Ennemi _-> putpixel rouge (x+i) (y+i)
-                     |Allie _-> putpixel vert_clair (x+i) (y+i) 
+                     |Allie _-> putpixel vert (x+i) (y+i) 
          done
     done
 done
@@ -179,7 +199,7 @@ let draw_skill_range (n,v)  skill=
 	let rec aux_draw_skill_range (n,v) l =
 	match l with 
 	|[] -> []
-	|(x,y)::q -> begin putpixel vert (n+x) (v+y); aux_draw_skill_range (n,v) q end
+	|(x,y)::q -> begin putpixel vert_clair (n+x) (v+y); aux_draw_skill_range (n,v) q end
 in
 	ignore (aux_draw_skill_range (n,v) skill.range)
 
@@ -215,9 +235,9 @@ Random.self_init ();
     let h = match get_size ()with (x,_) -> x in
         let continue = ref true in
     let frames = ref 0 in
-    let w = h in
+    (*let w = h in
     let t_x = ref (w/2) in
-    let t_y = ref (h/2) in
+    let t_y = ref (h/2) in*)
 
     (* boucle principale *)
     while !continue do
@@ -227,14 +247,18 @@ Random.self_init ();
         clear ();
         couleur rouge noir;
         let m = mapofstring cases in
+		m.(a.y).(a.x) <- Allie a;
         draw_board m h;
 
 		draw_skill_range (7,6) blast_skill;
+		draw_skill_range (7,10) ray_skill;
+		draw_skill_range (15,15) slash_skill;
+		draw_skill_range (13,6) healAura_skill;
 
         (* on écrit un texte qui peut se déplacer avec
            les fléches *)
-        couleur blanc noir;
-        ignore (mvaddstr !t_y !t_x (Printf.sprintf "Texte en %dx%d a deplacer avec les fleches" !t_x !t_y));
+        (*couleur blanc noir;
+        ignore (mvaddstr !t_y !t_x (Printf.sprintf "Texte en %dx%d a deplacer avec les fleches" !t_x !t_y));*)
 
         incr frames;
 
@@ -251,10 +275,10 @@ Random.self_init ();
             (* attention certaines touches sont spéciales et ne
                peuvent pas être converties en caractère comme les
                touches fléchées *)
-            if c = Key.down then t_y := min (!t_y+1) (h-2)
-            else if c = Key.up then t_y := max (!t_y-1) 1
-            else if c = Key.left then t_x := max (!t_x-1) 1 
-            else if c = Key.right then t_x := min (!t_x+1) (w-2)
+            if c = Key.down then a.y <- a.y + 1
+            else if c = Key.up then a.y <- a.y - 1
+            else if c = Key.left then a.x <- a.x - 1 
+            else if c = Key.right then a.x <- a.x + 1
             else (match char_of_int c with
                 (* des caractères normaux *)
                 | 'q' -> continue := false

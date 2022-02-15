@@ -19,7 +19,7 @@ type entite = {
 	mutable can_move: bool
 }
 
-type tile = Mur |  Vide| Allie of entite | Ennemi of entite 
+type tile = Bord | Mur | Vide | Allie of entite | Ennemi of entite 
 
 
 
@@ -58,6 +58,30 @@ let cases = "##################################-------################----------
 
 let map_create () = Array.make_matrix 25 25 Vide
 
+let generate_walls map = 
+	let check_near map x y=
+		let c= ref 0 in
+		for i=0 to 2 do
+			for j=0 to 2 do
+				if i<>1 || j<>1 then 
+					match map.(y+i-1).(x+j-1) with
+					| Mur -> c:= !c+1
+					| Vide -> c:= !c
+					| _ -> c:= 10
+			done;
+		done;
+		!c
+	in
+	let walls = ref 0 in
+	while !walls < 40 do
+		(*let x = 6+(Random.int 13) and y = 3+(Random.int 19) in  Cela limite le spawn de murs vers le centre de la map *)
+		let x = Random.int 25 and y = Random.int 25 in
+		if map.(y).(x) = Vide then begin
+			if check_near map x y <= 3 then map.(y).(x) <- Mur;
+			walls := !walls+1;
+		end
+	done
+
 let _ =
     let w = initscr () in
     assert(nodelay w true);
@@ -95,7 +119,7 @@ let a   = {
 	mpmax = 10;
     hp = 5;
     mp = 2;
-    x = 9;
+    x = 4;
 	y = 9;
     skills= (Existe blast_skill,Existe ray_skill,Existe slash_skill,Existe healAura_skill);
 	can_move = false;
@@ -104,7 +128,8 @@ let a   = {
 (*définitions des couleurs*)
 
 let noir = 0
-let gris = noir+1
+let gris_fonce = noir+1
+let gris = gris_fonce+1
 let blanc = gris+1
 let rouge = blanc+1
 let rouge_clair = rouge+1
@@ -116,6 +141,7 @@ let bleu_clair = bleu+1
 
 let cree_couleurs () =
     assert(init_color noir 0 0 0);
+    assert(init_color gris_fonce 200 200 200);
     assert(init_color gris 500 500 500);
     assert(init_color blanc 1000 1000 1000);
     assert(init_color rouge 1000 0 0);
@@ -172,7 +198,7 @@ let mapofstring s =
     let m = map_create () in
     for y = 0 to 24 do 
         for x = 0 to 24 do
-         if s.[x + (y * 25)]  = '#' then m.(y).(x) <- Mur else m.(y).(x) <- Vide
+         if s.[x + (y * 25)]  = '#' then m.(y).(x) <- Bord else m.(y).(x) <- Vide
     done
 done;
 m
@@ -184,10 +210,11 @@ let draw_board m h =
         for x = 0 to 24 do 
             for i = 0 to mult-1 do 
                      match m.(y).(x) with
-                     |Vide -> putpixel noir (x+i) (y+i)
-                     |Mur -> putpixel  gris (x+i) (y+i)
+					 | Bord -> putpixel gris_fonce (x+i) (y+i)
+                     | Vide -> putpixel noir (x+i) (y+i)
+                     | Mur -> putpixel  gris (x+i) (y+i)
                      | Ennemi _-> putpixel rouge (x+i) (y+i)
-                     |Allie a-> if a.can_move then putpixel vert (x+i) (y+i) else putpixel vert_clair (x+i) (y+i)
+                     | Allie a-> if a.can_move then putpixel vert (x+i) (y+i) else putpixel vert_clair (x+i) (y+i)
          done
     done
 done
@@ -237,6 +264,13 @@ let move_entite map ent dx dy =
 		if map.(ent.y+dy).(ent.x+dx) = Vide then begin
 			ent.x <- ent.x + dx;
 			ent.y <- ent.y + dy;
+			match map.(ent.y).(ent.x) with
+			| Allie _ -> map.(ent.y).(ent.x) <- Allie ent; map.(ent.y-dy).(ent.x-dx) <- Vide;
+			| Ennemi _ -> map.(ent.y).(ent.x) <- Ennemi ent; map.(ent.y-dy).(ent.x-dx) <- Vide;
+			(* Les match suivants n'ont pas de sens mais produisent une erreur s'ils n'existent pas (pattern non vérifié) *)
+			| Mur -> map.(ent.y).(ent.x) <- Mur; map.(ent.y-dy).(ent.x-dx) <- Vide;
+			| Vide -> map.(ent.y).(ent.x) <- Vide; map.(ent.y-dy).(ent.x-dx) <- Vide;
+			| Bord -> map.(ent.y).(ent.x) <- Bord; map.(ent.y-dy).(ent.x-dx) <- Vide;
 		end
 	
 
@@ -252,10 +286,10 @@ Random.self_init ();
     let h = match get_size ()with (x,_) -> x in
         let continue = ref true in
     let frames = ref 0 in
-    (*let w = h in
-    let t_x = ref (w/2) in
-    let t_y = ref (h/2) in*)
 
+    let m = mapofstring cases in
+	m.(a.y).(a.x) <- Allie a;
+	generate_walls m;
     (* boucle principale *)
     while !continue do
         (* le clear permet de ne pas avoir de problèmes avec les animations
@@ -263,21 +297,16 @@ Random.self_init ();
            réecrire par dessus ce qui a changé *)
         clear ();
         couleur rouge noir;
-        let m = mapofstring cases in
 		m.(a.y).(a.x) <- Allie a;
         draw_board m h;
 
-		draw_skill_range (7,6) blast_skill;
+		(*draw_skill_range (7,6) blast_skill;
 		draw_skill_range (7,10) ray_skill;
 		draw_skill_range (15,15) slash_skill;
-		draw_skill_range (13,6) healAura_skill;
+		draw_skill_range (13,6) healAura_skill;*)
 		
 		couleur blanc noir;
 		draw_UI_main a 1;
-        (* on écrit un texte qui peut se déplacer avec
-           les fléches *)
-        (*couleur blanc noir;
-        ignore (mvaddstr !t_y !t_x (Printf.sprintf "Texte en %dx%d a deplacer avec les fleches" !t_x !t_y));*)
 
         incr frames;
 

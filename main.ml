@@ -16,7 +16,9 @@ type entite = {
     mutable x: int;
 	mutable y: int;
     mutable skills: attaque * attaque * attaque * attaque;
-	mutable can_move: bool
+	mutable moves: int;
+	mutable can_move: bool;
+	mutable can_attack: bool;
 }
 
 type tile = Bord | Mur | Vide | Allie of entite | Ennemi of entite 
@@ -114,15 +116,49 @@ let healAura_skill = {
 	range = [(-2,0);(-1,-1);(-1,0);(-1,1);(0,-2);(0,-1);(0,1);(0,2);(1,-1);(1,0);(1,1);(2,0)]
 }
 
-let a   = {
+let punch_skill = {
+	name = "Frappe";
+	description = "Coup puissant droit devant le personnage";
+	range = [(1,0)]
+}
+
+let a = {
 	hpmax = 15;
 	mpmax = 10;
-    hp = 5;
-    mp = 2;
+    hp = 15;
+    mp = 10;
     x = 4;
 	y = 9;
     skills= (Existe blast_skill,Existe ray_skill,Existe slash_skill,Existe healAura_skill);
-	can_move = false;
+	moves = 0;
+	can_move = true;
+	can_attack = true;
+}
+
+let e1 = {
+	hpmax = 10;
+	mpmax = 5;
+    hp = 10;
+    mp = 5;
+    x = 20;
+	y = 9;
+    skills= (Existe punch_skill, Nulle,Nulle,Nulle);
+	moves = 0;
+	can_move = true;
+	can_attack = true;
+}
+
+let e2 = {
+	hpmax = 10;
+	mpmax = 5;
+    hp = 10;
+    mp = 5;
+    x = 20;
+	y = 15;
+    skills= (Existe punch_skill, Nulle,Nulle,Nulle);
+	moves = 0;
+	can_move = true;
+	can_attack = true;
 }
 
 (*définitions des couleurs*)
@@ -214,7 +250,7 @@ let draw_board m h =
                      | Vide -> putpixel noir (x+i) (y+i)
                      | Mur -> putpixel  gris (x+i) (y+i)
                      | Ennemi _-> putpixel rouge (x+i) (y+i)
-                     | Allie a-> if a.can_move then putpixel vert (x+i) (y+i) else putpixel vert_clair (x+i) (y+i)
+                     | Allie a-> if a.moves>0 then putpixel vert (x+i) (y+i) else putpixel vert_clair (x+i) (y+i)
          done
     done
 done
@@ -227,8 +263,9 @@ let draw_UI_main ent cursor =
     ignore (mvaddstr 5 30 (Printf.sprintf "HP: %d/%d" ent.hp ent.hpmax));
     ignore (mvaddstr 5 50 (Printf.sprintf "MP: %d/%d" ent.mp ent.mpmax));
     ignore (mvaddstr 10 35 (Printf.sprintf "Que faire ? :"));
-    ignore (mvaddstr 15 30 (Printf.sprintf "Attaquer :    A"));
-    ignore (mvaddstr 18 30 (Printf.sprintf "Se deplacer : M"));
+    if ent.can_move then ignore (mvaddstr 15 30 (Printf.sprintf "Se deplacer :    D"));
+    if ent.can_attack then ignore (mvaddstr 18 30 (Printf.sprintf "Attaquer :       A"));
+    ignore (mvaddstr 21 30 (Printf.sprintf "Finir le tour :  F"));
     if cursor = 1 then putpixel rouge_clair 3 45 else putpixel rouge_clair 3 50
 
 
@@ -243,27 +280,28 @@ in
 
 
 let draw_UI_Attaques ent =
-	let draw_skill x y skill = 
+	let draw_skill x y skill number= 
 	match skill with
 	|Nulle -> ignore (mvaddstr x y (Printf.sprintf "" ));
 	|Existe s ->begin
-			    ignore (mvaddstr x y (Printf.sprintf "%s" s.name));
+			    ignore (mvaddstr x y (Printf.sprintf "%d : %s" number s.name));
 			    ignore(mvaddstr (x+3) (y+1) (Printf.sprintf "%s" s.description ))
 			end
 			in
 	match ent.skills with
 	|a,b,c,d -> begin 
-				draw_skill 5 30 a;
-				draw_skill 15 30 b;
-				draw_skill 25 30 c;
-				draw_skill 35 30 d
+				draw_skill 5 30 a 1;
+				draw_skill 15 30 b 2;
+				draw_skill 25 30 c 3;
+				draw_skill 35 30 d 4
 end
 	
 let move_entite map ent dx dy =
-	if ent.can_move then
+	if ent.moves > 0 then
 		if map.(ent.y+dy).(ent.x+dx) = Vide then begin
 			ent.x <- ent.x + dx;
 			ent.y <- ent.y + dy;
+			ent.moves <- ent.moves - 1;
 			match map.(ent.y).(ent.x) with
 			| Allie _ -> map.(ent.y).(ent.x) <- Allie ent; map.(ent.y-dy).(ent.x-dx) <- Vide;
 			| Ennemi _ -> map.(ent.y).(ent.x) <- Ennemi ent; map.(ent.y-dy).(ent.x-dx) <- Vide;
@@ -289,7 +327,10 @@ Random.self_init ();
 
     let m = mapofstring cases in
 	m.(a.y).(a.x) <- Allie a;
+	m.(e1.y).(e1.x) <- Ennemi e1;
+	m.(e2.y).(e2.x) <- Ennemi e2;
 	generate_walls m;
+	let attack_ready = ref false in
     (* boucle principale *)
     while !continue do
         (* le clear permet de ne pas avoir de problèmes avec les animations
@@ -306,7 +347,8 @@ Random.self_init ();
 		draw_skill_range (13,6) healAura_skill;*)
 		
 		couleur blanc noir;
-		draw_UI_main a 1;
+		if !attack_ready then draw_UI_Attaques a
+		else if a.moves = 0 then draw_UI_main a 1;
 
         incr frames;
 
@@ -330,10 +372,10 @@ Random.self_init ();
             else (match char_of_int c with
                 (* des caractères normaux *)
                 | 'q' -> continue := false
-				| 'm' -> a.can_move <- (not a.can_move)
+				| 'd' -> if a.can_move then begin a.moves <- 5; a.can_move <- false end
+				| 'a' -> if a.moves=0 then attack_ready := true;
                 | _ -> ())
         end
     done;
 
-    endwin ()
-
+    endwin ();

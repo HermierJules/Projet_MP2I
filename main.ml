@@ -26,22 +26,31 @@ type tile = Mur |  Vide| Allie of entite | Ennemi of entite
 
 (*definitions*)
 
-let pathfinder x1 y1 x2 y2 =
+let pathfinder map x1 y1 x2 y2 =
     let dist x1 y1 x2 y2 =
         let distance = Float.sqrt ((float_of_int ((x1-x2)*(x1-x2)))+.(float_of_int ((y1-y2)*(y1-y2)))) in
         distance
     in
     let x = ref x1 and y = ref y1 in
-    while (dist !x !y x2 y2) >= (dist x1 y1 x2 y2) do
-        x := x1;
-        y := y1;
-        let move = Random.int 4 in
-        if move = 0 then x := !x+1
-        else if move = 1 then x := !x-1
-        else if move = 2 then y := !y+1
-        else if move = 3 then y := !y-1
+	let flag = ref (false,(0,0)) in
+	for i=1 to 10 do
+		if i=i then begin (* obligé sinon erreur car i n'est pas utilisé*)
+			x := x1;
+			y := y1;
+			let move = Random.int 4 in
+			if move = 0 then x := !x+1
+			else if move = 1 then x := !x-1
+			else if move = 2 then y := !y+1
+			else if move = 3 then y := !y-1;
+			if map.(!y).(!x) <> Vide then begin
+				x := x1;
+				y := y1;
+			end;
+			if (dist !x !y x2 y2) < (dist x1 y1 x2 y2) then flag := (true,(!x,!y));
+		end;
     done;
-    (!x,!y)
+	match !flag with
+	| (b,coords) -> if b = true then coords else (x1,y1) 
 
 
 

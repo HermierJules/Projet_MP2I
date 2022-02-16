@@ -4,8 +4,8 @@ open Curses
 type skill = {
 	name : string;
 	description: string;
-	range : (int*int) list;
-	dmg : int;
+	mutable range : (int*int) list;
+	mutable dmg : int;
 	cost : int
 	}
 type attaque = Nulle | Existe of skill
@@ -307,7 +307,7 @@ let draw_skill_range (n,v) skill map =
 	let rec aux_draw_skill_range (n,v) l =
 	match l with 
 	|[] -> []
-	|(x,y)::q -> begin if map.(v+y).(n+x) = Vide then putpixel blanc (n+x) (v+y); aux_draw_skill_range (n,v) q end
+	|(x,y)::q -> begin if (v+y>=0 && v+y<=24) && (n+x>=0 && n+x<=24) then if map.(v+y).(n+x) = Vide then putpixel blanc (n+x) (v+y); aux_draw_skill_range (n,v) q end
 in
 	ignore (aux_draw_skill_range (n,v) skill.range)
 
@@ -318,17 +318,19 @@ let draw_UI_Attaques ent =
 	|Nulle -> ignore (mvaddstr x y (Printf.sprintf "" ));
 	|Existe s ->begin
 			    ignore (mvaddstr x y (Printf.sprintf "%c : %s" letter s.name));
-			    ignore(mvaddstr (x+3) (y+1) (Printf.sprintf "%s" s.description ))
+			    ignore(mvaddstr (x+2) (y+1) (Printf.sprintf "%s" s.description ))
 			end
 			in
 	match ent.skills with
 	|a,b,c,d -> begin 
-				draw_skill 5 30 a 'U';
-				draw_skill 15 30 b 'I';
-				draw_skill 25 30 c 'O';
-				draw_skill 35 30 d 'P'
-end
+					draw_skill 3 30 a 'U';
+					draw_skill 10 30 b 'I';
+					draw_skill 17 30 c 'O';
+					draw_skill 24 30 d 'P'
+				end;
+	ignore(mvaddstr 30 10 (Printf.sprintf "Une fois une attaque selectionnee appuyez sur R pour la tourner"))
 	
+(* Enleve le Existe pour pouvoir manipuler les skills *)
 let unwrap_skill s =
 	match s with
 	| Existe x -> x
@@ -338,6 +340,7 @@ let unwrap_skill s =
 				dmg = 0;
 				cost = 0}
 	
+(* Deplacement d'une entite *)
 let move_entite map ent dx dy =
 	if ent.moves > 0 then
 		if map.(ent.y+dy).(ent.x+dx) = Vide then begin
@@ -353,15 +356,27 @@ let move_entite map ent dx dy =
 			| Bord -> map.(ent.y).(ent.x) <- Bord; map.(ent.y-dy).(ent.x-dx) <- Vide;
 		end
 	
+(* Trouver un skill parmi la liste des skills avec un indice *)
 let find_skill ent n =
 	match ent.skills with
 	| (s1,s2,s3,s4) -> if n = 1 then s1 else if n = 2 then s2 else if n = 3 then s3 else if n = 4 then s4 else Nulle
 
-
+(* Prise de degats et mort des ennemis *)
 let take_dmg ent dmg map = 
 	ent.hp <- ent.hp - dmg;
 	if ent.hp <= 0 then map.(ent.y).(ent.x) <- Vide
 
+(* Rotation de la visée d'un skill*)
+let rotate_skill s =
+	let rec aux range =
+		match range with
+		| [] -> []
+		| (x,y)::q -> (-y,x)::(aux q)
+	in
+	s.range <- aux s.range
+						
+
+(* Fonction qui fait les degats d'un skill *)
 let use_skill ent s map = 
 	let rec use_skill_aux dmg range =
 		match range with
@@ -375,6 +390,7 @@ let use_skill ent s map =
 	use_skill_aux move.dmg move.range;
 	ent.mp <- ent.mp - move.cost
 
+(* Activation d'un skill (fonction bizarre mais c'est pour eviter de taper 5 fois le même truc) *)
 let activate_skill ent skill_sel atk_ready map=
 	if !ent.mp >= (unwrap_skill (find_skill !ent !skill_sel)).cost then begin
 		use_skill !ent (find_skill !ent !skill_sel) map;
@@ -383,21 +399,31 @@ let activate_skill ent skill_sel atk_ready map=
 		atk_ready := false;
 	end
 	
-
+(* Gestion du tour des ennemis*)
 let enemies_turn enemies map =
 	let enemy_turn e target=
 		for i=1 to 3 do
 			e.moves <- e.moves + 1;
 			if i=i then 
 				match (pathfinder map e.x e.y target.x target.y) with
-				| (x,y) -> move_entite map e (x-e.x) (y-e.y)
+				| (x,y) -> move_entite map e (x-e.x) (y-e.y);
+			draw_board map 25;
+			Unix.sleepf 0.03;
+        	assert(refresh ());
 		done;
-		
+		e.can_attack <- true;
 		match e.skills with
-		| (s1,s2,s3,s4) -> if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s1).range && e.can_attack then activate_skill (ref e) (ref 1) (ref true) map;
-						   if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s2).range && e.can_attack then activate_skill (ref e) (ref 2) (ref true) map;
-						   if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s3).range && e.can_attack then activate_skill (ref e) (ref 3) (ref true) map;
-						   if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s4).range && e.can_attack then activate_skill (ref e) (ref 4) (ref true) map
+		| (s1,s2,s3,s4) ->  for i=1 to 4 do
+								if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s1).range && e.can_attack then activate_skill (ref e) (ref 1) (ref true) map;
+						   		if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s2).range && e.can_attack then activate_skill (ref e) (ref 2) (ref true) map;
+						   		if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s3).range && e.can_attack then activate_skill (ref e) (ref 3) (ref true) map;
+						   		if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s4).range && e.can_attack then activate_skill (ref e) (ref 4) (ref true) map;
+								if i=i then begin
+									for j=1 to 4 do
+										rotate_skill (unwrap_skill (find_skill e j))
+									done;
+								end
+						    done;
 	in
 	for i=0 to Array.length enemies -1 do
 		if (dist enemies.(i).x enemies.(i).y mage.x mage.y) < (dist enemies.(i).x enemies.(i).y warrior.x warrior.y) then enemy_turn enemies.(i) mage
@@ -410,7 +436,7 @@ Random.self_init ();
 
     attroff(A.color);
     let h = match get_size ()with (x,_) -> x in
-        let continue = ref true in
+    let continue = ref true in
     let frames = ref 0 in
 
     let m = mapofstring cases in
@@ -505,6 +531,7 @@ Random.self_init ();
 							end
 							else skill_selected := 4;
 						end
+				| 'r' -> if !skill_selected > 0 then rotate_skill (unwrap_skill (find_skill !a !skill_selected))
 				| 's' -> if !a = mage then a:=warrior else a:=mage;
 				| 'f' -> mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn all_enemies m
                 | _ -> ())

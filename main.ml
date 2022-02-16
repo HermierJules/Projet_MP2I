@@ -4,7 +4,8 @@ open Curses
 type skill = {
 	name : string;
 	description: string;
-	range : (int*int) list
+	range : (int*int) list;
+	dmg : int
 	}
 type attaque = Nulle | Existe of skill
 
@@ -95,31 +96,36 @@ let _ =
 let blast_skill = {
 	name = "Explosion";
 	description = "Attaque autour du personnage (Portee: 2)";
-	range = [(-2,0);(-1,-1);(-1,0);(-1,1);(0,-2);(0,-1);(0,1);(0,2);(1,-1);(1,0);(1,1);(2,0)]
+	range = [(-2,0);(-1,-1);(-1,0);(-1,1);(0,-2);(0,-1);(0,1);(0,2);(1,-1);(1,0);(1,1);(2,0)];
+	dmg = 3;
 }
 
 let ray_skill = {
 	name = "Rayon";
 	description = "Attaque droit devant le personnage (Portee: 5)";
-	range = [(1,0);(2,0);(3,0);(4,0);(5,0)]
+	range = [(1,0);(2,0);(3,0);(4,0);(5,0)];
+	dmg = 4;
 }
 
 let slash_skill = {
 	name = "Taillade";
 	description = "Coup devant le personnage (Portee: 1)";
-	range = [(1,-1);(1,0);(1,1)]
+	range = [(1,-1);(1,0);(1,1)];
+	dmg = 6;
 }
 
 let healAura_skill = {
 	name = "Aura de Soin";
 	description = "Soin autour du personnage (Portee: 2)";
-	range = [(-2,0);(-1,-1);(-1,0);(-1,1);(0,-2);(0,-1);(0,1);(0,2);(1,-1);(1,0);(1,1);(2,0)]
+	range = [(-2,0);(-1,-1);(-1,0);(-1,1);(0,-2);(0,-1);(0,1);(0,2);(1,-1);(1,0);(1,1);(2,0)];
+	dmg = -4;
 }
 
 let punch_skill = {
 	name = "Frappe";
 	description = "Coup puissant droit devant le personnage";
-	range = [(1,0)]
+	range = [(1,0)];
+	dmg = 4;
 }
 
 let a = {
@@ -140,7 +146,7 @@ let e1 = {
 	mpmax = 5;
     hp = 10;
     mp = 5;
-    x = 20;
+    x = 7;
 	y = 9;
     skills= (Existe punch_skill, Nulle,Nulle,Nulle);
 	moves = 0;
@@ -270,30 +276,30 @@ let draw_UI_main ent cursor =
 
 
 
-let draw_skill_range (n,v)  skill=
+let draw_skill_range (n,v) skill map =
 	let rec aux_draw_skill_range (n,v) l =
 	match l with 
 	|[] -> []
-	|(x,y)::q -> begin putpixel blanc (n+x) (v+y); aux_draw_skill_range (n,v) q end
+	|(x,y)::q -> begin if map.(v+y).(n+x) = Vide then putpixel blanc (n+x) (v+y); aux_draw_skill_range (n,v) q end
 in
 	ignore (aux_draw_skill_range (n,v) skill.range)
 
 
 let draw_UI_Attaques ent =
-	let draw_skill x y skill number= 
+	let draw_skill x y skill letter= 
 	match skill with
 	|Nulle -> ignore (mvaddstr x y (Printf.sprintf "" ));
 	|Existe s ->begin
-			    ignore (mvaddstr x y (Printf.sprintf "%d : %s" number s.name));
+			    ignore (mvaddstr x y (Printf.sprintf "%c : %s" letter s.name));
 			    ignore(mvaddstr (x+3) (y+1) (Printf.sprintf "%s" s.description ))
 			end
 			in
 	match ent.skills with
 	|a,b,c,d -> begin 
-				draw_skill 5 30 a 1;
-				draw_skill 15 30 b 2;
-				draw_skill 25 30 c 3;
-				draw_skill 35 30 d 4
+				draw_skill 5 30 a 'U';
+				draw_skill 15 30 b 'I';
+				draw_skill 25 30 c 'O';
+				draw_skill 35 30 d 'P'
 end
 	
 let move_entite map ent dx dy =
@@ -311,11 +317,29 @@ let move_entite map ent dx dy =
 			| Bord -> map.(ent.y).(ent.x) <- Bord; map.(ent.y-dy).(ent.x-dx) <- Vide;
 		end
 	
+let find_skill ent n =
+	match ent.skills with
+	| (s1,s2,s3,s4) -> if n = 1 then s1 else if n = 2 then s2 else if n = 3 then s3 else if n = 4 then s4 else Nulle
 
 
+let take_dmg ent dmg map = 
+	ent.hp <- ent.hp - dmg;
+	if ent.hp <= 0 then map.(ent.y).(ent.x) <- Vide
+
+let use_skill ent s map = 
+	let rec use_skill_aux dmg range =
+		match range with
+		| [] -> ()
+		| (x,y)::q -> match map.(ent.y+y).(ent.x+x) with
+					  | Ennemi e -> begin take_dmg e dmg map; use_skill_aux dmg q end
+					  | Allie a -> begin take_dmg a dmg map; use_skill_aux dmg q end
+					  | _ -> use_skill_aux dmg q;
+	in 
+	match s with
+	| Existe move -> use_skill_aux move.dmg move.range
+	| Nulle -> use_skill_aux 0 []
 
 
-    
 
 let _ =
 Random.self_init ();
@@ -331,6 +355,7 @@ Random.self_init ();
 	m.(e2.y).(e2.x) <- Ennemi e2;
 	generate_walls m;
 	let attack_ready = ref false in
+	let skill_selected = ref 0 in
     (* boucle principale *)
     while !continue do
         (* le clear permet de ne pas avoir de problèmes avec les animations
@@ -340,14 +365,14 @@ Random.self_init ();
         couleur rouge noir;
 		m.(a.y).(a.x) <- Allie a;
         draw_board m h;
-
-		(*draw_skill_range (7,6) blast_skill;
-		draw_skill_range (7,10) ray_skill;
-		draw_skill_range (15,15) slash_skill;
-		draw_skill_range (13,6) healAura_skill;*)
 		
 		couleur blanc noir;
-		if !attack_ready then draw_UI_Attaques a
+		if !attack_ready then begin 
+			draw_UI_Attaques a;
+			match (find_skill a !skill_selected) with
+			| Existe s -> draw_skill_range (a.x,a.y) s m;
+			| Nulle -> skill_selected := 0;
+		end
 		else if a.moves = 0 then draw_UI_main a 1;
 
         incr frames;
@@ -372,8 +397,45 @@ Random.self_init ();
             else (match char_of_int c with
                 (* des caractères normaux *)
                 | 'q' -> continue := false
-				| 'd' -> if a.can_move then begin a.moves <- 5; a.can_move <- false end
-				| 'a' -> if a.moves=0 then attack_ready := true;
+				| 'd' -> if a.can_move && (not !attack_ready) then begin a.moves <- 5; a.can_move <- false end
+				| 'a' -> if a.moves=0 && a.can_attack then attack_ready := true;
+				| 'u' -> if !attack_ready then begin
+							if !skill_selected = 1 then begin
+								use_skill a (find_skill a !skill_selected) m;
+								skill_selected := 0;
+								a.can_attack <- false;
+								attack_ready := false;
+							end
+							else skill_selected := 1;
+						end
+				| 'i' -> if !attack_ready then begin
+							if !skill_selected = 2 then begin
+								use_skill a (find_skill a !skill_selected) m;
+								skill_selected := 0;
+								a.can_attack <- false;
+								attack_ready := false;
+							end
+							else skill_selected := 2;
+						end
+				| 'o' -> if !attack_ready then begin
+							if !skill_selected = 3 then begin
+								use_skill a (find_skill a !skill_selected) m;
+								skill_selected := 0;
+								a.can_attack <- false;
+								attack_ready := false;
+							end
+							else skill_selected := 3;
+						end
+				| 'p' -> if !attack_ready then begin
+							if !skill_selected = 4 then begin
+								use_skill a (find_skill a !skill_selected) m;
+								skill_selected := 0;
+								a.can_attack <- false;
+								attack_ready := false;
+							end
+							else skill_selected := 4;
+						end
+				| 'f' -> a.can_move <- true;a.can_attack <- true; 
                 | _ -> ())
         end
     done;

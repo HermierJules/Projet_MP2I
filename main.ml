@@ -452,7 +452,12 @@ let check = ref true in
 while !check do
 	x:= Random.int 24;
 	y:= Random.int 24;
-	if m.(!y).(!x) = Vide then begin m.(!y).(!x) <- Ennemi e; l:= e::!l; check:= false end
+	if m.(!y).(!x) = Vide then begin
+										e.x <- !x;
+										e.y <- !y;
+										 m.(!y).(!x) <- Ennemi e; 
+										 l:= e::!l; check:= false 
+													end
 done;
 !l
 

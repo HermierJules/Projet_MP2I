@@ -256,10 +256,7 @@ let putpixel col x y =
     couleur col col;
     assert (mvaddch y x (int_of_char ' '))
 
-let ligne_horiz col x1 x2 y =
-    for x = x1 to x2 do
-        putpixel col x y
-    done
+
 
 
 let mapofstring s =
@@ -290,9 +287,10 @@ done
 (*let's draw the UI*)
 
 
-let draw_UI_main ent cursor =
+let draw_UI_main ent cursor score=
 	couleur blanc noir;
     ignore (mvaddstr 5 30 (Printf.sprintf "HP: %d/%d" ent.hp ent.hpmax));
+    ignore (mvaddstr 0 30 (Printf.sprintf "Score: %d" !score));
     ignore (mvaddstr 5 50 (Printf.sprintf "MP: %d/%d" ent.mp ent.mpmax));
     ignore (mvaddstr 10 35 (Printf.sprintf "Que faire ? :"));
     if ent.can_move then ignore (mvaddstr 15 30 (Printf.sprintf "D : Se deplacer"));
@@ -358,33 +356,34 @@ let find_skill ent n =
 	| (s1,s2,s3,s4) -> if n = 1 then s1 else if n = 2 then s2 else if n = 3 then s3 else if n = 4 then s4 else Nulle
 
 
-let take_dmg ent dmg map = 
+let take_dmg ent dmg map score = 
 	ent.hp <- ent.hp - dmg;
-	if ent.hp <= 0 then map.(ent.y).(ent.x) <- Vide
+	if ent.hp <= 0 then begin map.(ent.y).(ent.x) <- Vide; score:= !score + 1 end
 
-let use_skill ent s map = 
+let use_skill ent s map score = 
 	let rec use_skill_aux dmg range =
 		match range with
 		| [] -> ()
 		| (x,y)::q -> match map.(ent.y+y).(ent.x+x) with
-					  | Ennemi e -> begin take_dmg e dmg map; use_skill_aux dmg q end
-					  | Allie a -> begin take_dmg a dmg map; use_skill_aux dmg q end
+					  | Ennemi e -> begin take_dmg e dmg map score; use_skill_aux dmg q end
+					  | Allie a -> begin take_dmg a dmg map score; use_skill_aux dmg q end
 					  | _ -> use_skill_aux dmg q;
 	in 
 	let move = unwrap_skill s in
 	use_skill_aux move.dmg move.range;
 	ent.mp <- ent.mp - move.cost
 
-let activate_skill ent skill_sel atk_ready map=
+let activate_skill ent skill_sel atk_ready map score=
 	if !ent.mp >= (unwrap_skill (find_skill !ent !skill_sel)).cost then begin
-		use_skill !ent (find_skill !ent !skill_sel) map;
+		use_skill !ent (find_skill !ent !skill_sel) map score;
 		skill_sel := 0;
 		!ent.can_attack <- false;
 		atk_ready := false;
 	end
 	
 
-let enemies_turn enemies map =
+
+let enemies_turn enemies map score =
 	let enemy_turn e target=
 		for i=1 to 3 do
 			e.moves <- e.moves + 1;
@@ -394,21 +393,31 @@ let enemies_turn enemies map =
 		done;
 		
 		match e.skills with
-		| (s1,s2,s3,s4) -> if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s1).range && e.can_attack then activate_skill (ref e) (ref 1) (ref true) map;
-						   if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s2).range && e.can_attack then activate_skill (ref e) (ref 2) (ref true) map;
-						   if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s3).range && e.can_attack then activate_skill (ref e) (ref 3) (ref true) map;
-						   if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s4).range && e.can_attack then activate_skill (ref e) (ref 4) (ref true) map
+		| (s1,s2,s3,s4) -> if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s1).range && e.can_attack then activate_skill (ref e) (ref 1) (ref true) map score;
+						   if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s2).range && e.can_attack then activate_skill (ref e) (ref 2) (ref true) map score;
+						   if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s3).range && e.can_attack then activate_skill (ref e) (ref 3) (ref true) map score;
+						   if in_list (target.x-e.x,target.y-e.y) (unwrap_skill s4).range && e.can_attack then activate_skill (ref e) (ref 4) (ref true) map score
 	in
 	for i=0 to Array.length enemies -1 do
 		if (dist enemies.(i).x enemies.(i).y mage.x mage.y) < (dist enemies.(i).x enemies.(i).y warrior.x warrior.y) then enemy_turn enemies.(i) mage
 		else enemy_turn enemies.(i) warrior
 	done
 
+(*
+let ennemy_spawn m turn = 
+	let check = ref true in 
+	for i = 0 to turn + 2 do
+
+
+done
+*)
+
 
 let _ =
 Random.self_init ();
 
     attroff(A.color);
+    let score = ref 0 in
     let h = match get_size ()with (x,_) -> x in
         let continue = ref true in
     let frames = ref 0 in
@@ -441,7 +450,7 @@ Random.self_init ();
 			| Existe s -> draw_skill_range (!a.x,!a.y) s m;
 			| Nulle -> skill_selected := 0;
 		end
-		else if !a.moves = 0 then draw_UI_main !a 1;
+		else if !a.moves = 0 then draw_UI_main !a 1 score;
 
         incr frames;
 
@@ -475,12 +484,12 @@ Random.self_init ();
 						end
 				| 'a' -> if !a.moves=0 && !a.can_attack then attack_ready := true;
 				| 'u' -> if !attack_ready then begin
-							if !skill_selected = 1 then activate_skill a skill_selected attack_ready m
+							if !skill_selected = 1 then activate_skill a skill_selected attack_ready m score
 							else skill_selected := 1;
 						end
 				| 'i' -> if !attack_ready then begin
 							if !skill_selected = 2 then begin
-								use_skill !a (find_skill !a !skill_selected) m;
+								use_skill !a (find_skill !a !skill_selected) m score;
 								skill_selected := 0;
 								!a.can_attack <- false;
 								attack_ready := false;
@@ -489,7 +498,7 @@ Random.self_init ();
 						end
 				| 'o' -> if !attack_ready then begin
 							if !skill_selected = 3 then begin
-								use_skill !a (find_skill !a !skill_selected) m;
+								use_skill !a (find_skill !a !skill_selected) m score;
 								skill_selected := 0;
 								!a.can_attack <- false;
 								attack_ready := false;
@@ -498,7 +507,7 @@ Random.self_init ();
 						end
 				| 'p' -> if !attack_ready then begin
 							if !skill_selected = 4 then begin
-								use_skill !a (find_skill !a !skill_selected) m;
+								use_skill !a (find_skill !a !skill_selected) m score;
 								skill_selected := 0;
 								!a.can_attack <- false;
 								attack_ready := false;
@@ -506,7 +515,7 @@ Random.self_init ();
 							else skill_selected := 4;
 						end
 				| 's' -> if !a = mage then a:=warrior else a:=mage;
-				| 'f' -> mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn all_enemies m
+				| 'f' -> mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn all_enemies m score
                 | _ -> ())
         end
     done;

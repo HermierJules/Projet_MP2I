@@ -257,6 +257,10 @@ let putpixel col x y =
     assert (mvaddch y x (int_of_char ' '))
 
 
+let rec remove_element_list l x =
+match l with
+|[] -> []
+| t::q -> if t = x then q else t::remove_element_list q x
 
 
 let mapofstring s =
@@ -415,7 +419,7 @@ let activate_skill ent skill_sel atk_ready map score=
 		atk_ready := false;
 	end
 	
-let enemies_turn enemies map score =
+let  rec enemies_turn enemies map score =
 	let enemy_turn e target=
 		for i=1 to 3 do
 			e.moves <- e.moves + 1;
@@ -440,19 +444,42 @@ let enemies_turn enemies map score =
 								end
 						    done;
 	in
-	for i=0 to Array.length enemies -1 do
-		if (dist enemies.(i).x enemies.(i).y mage.x mage.y) < (dist enemies.(i).x enemies.(i).y warrior.x warrior.y) then enemy_turn enemies.(i) mage
-		else enemy_turn enemies.(i) warrior
-	done
-
-(*
-let ennemy_spawn m turn = 
-	let check = ref true in 
-	for i = 0 to turn + 2 do
+	match enemies with
+	|[] -> ()
+	|t::q->  if (dist t.x t.y mage.x mage.y) < (dist t.x t.y warrior.x warrior.y) then begin enemy_turn t mage; enemies_turn q map score end
+		else begin enemy_turn t warrior; enemies_turn q map score end
 
 
-done
-*)
+let ennemy_spawn m l = 
+Random.self_init ();
+let e = {
+	hpmax = 10;
+	mpmax = 5;
+    hp = 10;
+    mp = 5;
+    x = 21;
+	y = 12;
+    skills= (Existe slash_skill,Existe blast_skill,Existe ray_skill,Existe healAura_skill);
+	moves = 3;
+	can_move = true;
+	can_attack = true;
+}
+in
+let x = ref 0 in
+let y = ref 0 in
+let check = ref true in
+while !check do
+	x:= Random.int 24;
+	y:= Random.int 24;
+	if m.(!y).(!x) = Vide then begin
+										e.x <- !x;
+										e.y <- !y;
+										 m.(!y).(!x) <- Ennemi e; 
+										 l:= e::!l; check:= false 
+													end
+done;
+!l
+
 
 
 let _ =
@@ -473,7 +500,8 @@ Random.self_init ();
 	generate_walls m;
 	let attack_ready = ref false and skill_selected = ref 0 in
 	let a = ref mage in
-	let all_enemies = [|e1;e2;e3|] in
+	let all_enemies = ref [e1;e2;e3] in
+	all_enemies := ennemy_spawn m all_enemies;
     (* boucle principale *)
     while !continue do
         (* le clear permet de ne pas avoir de problèmes avec les animations
@@ -558,7 +586,7 @@ Random.self_init ();
 						end
 				| 'r' -> if !skill_selected > 0 then rotate_skill (unwrap_skill (find_skill !a !skill_selected))
 				| 's' -> if !a = mage then a:=warrior else a:=mage;
-				| 'f' -> mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn all_enemies m score
+				| 'f' -> mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn !all_enemies m score
                 | _ -> ())
         end
     done;

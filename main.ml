@@ -99,7 +99,7 @@ let _ =
 let blast_skill = {
 	name = "Explosion";
 	description = "Attaque autour du personnage (Portee: 2)";
-	range = [(-2,0);(-1,-1);(-1,0);(-1,1);(0,-2);(0,-1);(0,1);(0,2);(1,-1);(1,0);(1,1);(2,0)];
+	range = [(3,3)];
 	dmg = 4;
 	cost = 3;
 }
@@ -364,6 +364,24 @@ let take_dmg ent dmg map score =
 	ent.hp <- ent.hp - dmg;
 	if ent.hp <= 0 then begin map.(ent.y).(ent.x) <- Vide; score:= !score + 1 end
 
+let skill_range_circle ent s map=
+	let rec aux x y range visited =
+		if map.(y).(x) = Vide || !visited = [] then begin
+			visited := (x,y)::(!visited);
+			if range > 0 then  begin
+				aux (x+1) y (range-1) visited;
+				aux (x-1) y (range-1) visited;
+				aux x (y+1) (range-1) visited;
+				aux x (y-1) (range-1) visited;
+			end;
+		end;
+	in
+	let range = ref [] in
+	match s.range with
+	| [] -> [];
+	| (x,y)::q -> if q=q && y=y then aux ent.x ent.y x range;
+	!range
+
 (* Rotation de la visée d'un skill*)
 let rotate_skill s =
 	let rec aux range =
@@ -385,7 +403,8 @@ let use_skill ent s map score =
 					  | _ -> use_skill_aux dmg q;
 	in 
 	let move = unwrap_skill s in
-	use_skill_aux move.dmg move.range;
+	if move = blast_skill then use_skill_aux move.dmg (skill_range_circle ent move map)
+	else use_skill_aux move.dmg move.range;
 	ent.mp <- ent.mp - move.cost
 
 let activate_skill ent skill_sel atk_ready map score=

@@ -396,7 +396,7 @@ let activate_skill ent skill_sel atk_ready map score=
 		atk_ready := false;
 	end
 	
-let enemies_turn enemies map score =
+let  rec enemies_turn enemies map score =
 	let enemy_turn e target=
 		for i=1 to 3 do
 			e.moves <- e.moves + 1;
@@ -421,10 +421,10 @@ let enemies_turn enemies map score =
 								end
 						    done;
 	in
-	for i=0 to Array.length enemies -1 do
-		if (dist enemies.(i).x enemies.(i).y mage.x mage.y) < (dist enemies.(i).x enemies.(i).y warrior.x warrior.y) then enemy_turn enemies.(i) mage
-		else enemy_turn enemies.(i) warrior
-	done
+	match enemies with
+	|[] -> ()
+	|t::q->  if (dist t.x t.y mage.x mage.y) < (dist t.x t.y warrior.x warrior.y) then begin enemy_turn t mage; enemies_turn q map score end
+		else begin enemy_turn t warrior; enemies_turn q map score end
 
 (*
 let ennemy_spawn m turn = 
@@ -454,7 +454,7 @@ Random.self_init ();
 	generate_walls m;
 	let attack_ready = ref false and skill_selected = ref 0 in
 	let a = ref mage in
-	let all_enemies = [|e1;e2;e3|] in
+	let all_enemies = [e1;e2;e3] in
     (* boucle principale *)
     while !continue do
         (* le clear permet de ne pas avoir de problèmes avec les animations

@@ -305,6 +305,15 @@ let draw_UI_main ent cursor score=
 
 
 
+let heal m = 
+	for y = 0 to 24 do
+	   for x = 0 to 24 do
+	   	match m.(y).(x) with
+	   	|Allie x -> x.hp <- (x.hp + 5); x.mp <- (x.mp + 5); if x.hp > x.hpmax then x.hp <- x.hpmax; if x.mp > x.mpmax then x.mp <- x.mpmax
+	   	|_ -> ()
+	done
+done
+
 let draw_skill_range (n,v) skill map =
 	let rec aux_draw_skill_range (n,v) l =
 	match l with 
@@ -367,7 +376,7 @@ let find_skill ent n =
 
 let take_dmg ent dmg map score = 
 	ent.hp <- ent.hp - dmg;
-	if ent.hp <= 0 then begin map.(ent.y).(ent.x) <- Vide; score:= !score + 1 end
+	if ent.hp <= 0 then begin map.(ent.y).(ent.x) <- Vide; score:= !score + 1; heal map end
 
 (* Rotation de la visée d'un skill*)
 let rotate_skill s =

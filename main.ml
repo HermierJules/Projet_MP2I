@@ -320,7 +320,8 @@ let draw_UI_Attaques ent =
 	|Nulle -> ignore (mvaddstr x y (Printf.sprintf "" ));
 	|Existe s ->begin
 			    ignore (mvaddstr x y (Printf.sprintf "%c : %s" letter s.name));
-			    ignore(mvaddstr (x+2) (y+1) (Printf.sprintf "%s" s.description ))
+			    ignore(mvaddstr (x+2) (y+1) (Printf.sprintf "%s" s.description ));
+			    ignore(mvaddstr (x+3) (y+1) (Printf.sprintf "cout: %d mp" s.cost ))
 			end
 			in
 	match ent.skills with

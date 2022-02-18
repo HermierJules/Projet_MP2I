@@ -112,7 +112,7 @@ let ray_skill = {
 	description = "Attaque droit devant le personnage (Portee: 5)";
 	skill_type = "Ray";
 	range = [(1,0);(2,0);(3,0);(4,0);(5,0)];
-	dmg = 5;
+	dmg = 6;
 	cost = 3;
 }
 
@@ -121,7 +121,7 @@ let slash_skill = {
 	description = "Coup devant le personnage de la droite vers la gauche (Portee: 1)";
 	skill_type = "Ray";
 	range = [(1,1);(1,0);(1,-1)];
-	dmg = 4;
+	dmg = 5;
 	cost = 0;
 }
 
@@ -655,7 +655,7 @@ Random.self_init ();
 				| 's' -> if !a = mage && not warrior.dead then a:=warrior else if !a = warrior && not mage.dead then a:=mage;
 				| 'f' -> if !a.moves = 0 && not !lose then begin
 							mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn !all_enemies m score; incr turn; 
-							if !turn mod 3 = 0 then all_enemies := ennemy_spawn m all_enemies; 
+							if !turn mod 3 = 0 then begin all_enemies := ennemy_spawn m all_enemies; all_enemies := ennemy_spawn m all_enemies end
 						end
 				| _ -> ())
 		end

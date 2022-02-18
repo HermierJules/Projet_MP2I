@@ -4,6 +4,7 @@ open Curses
 type skill = {
 	name : string;
 	description: string;
+	skill_type : string;
 	mutable range : (int*int) list;
 	mutable dmg : int;
 	cost : int
@@ -99,7 +100,8 @@ let _ =
 let blast_skill = {
 	name = "Explosion";
 	description = "Attaque autour du personnage (Portee: 2)";
-	range = [(3,3)];
+	skill_type = "Radius";
+	range = [(3,0)];
 	dmg = 4;
 	cost = 3;
 }
@@ -107,6 +109,7 @@ let blast_skill = {
 let ray_skill = {
 	name = "Rayon";
 	description = "Attaque droit devant le personnage (Portee: 5)";
+	skill_type = "Ray";
 	range = [(1,0);(2,0);(3,0);(4,0);(5,0)];
 	dmg = 5;
 	cost = 4;
@@ -114,8 +117,9 @@ let ray_skill = {
 
 let slash_skill = {
 	name = "Taillade";
-	description = "Coup devant le personnage (Portee: 1)";
-	range = [(1,-1);(1,0);(1,1)];
+	description = "Coup devant le personnage de la droite vers la gauche (Portee: 1)";
+	skill_type = "Ray";
+	range = [(1,1);(1,0);(1,-1)];
 	dmg = 6;
 	cost = 0;
 }
@@ -123,7 +127,8 @@ let slash_skill = {
 let healAura_skill = {
 	name = "Aura de Soin";
 	description = "Soin autour du personnage (Portee: 2)";
-	range = [(-2,0);(-1,-1);(-1,0);(-1,1);(0,-2);(0,-1);(0,1);(0,2);(1,-1);(1,0);(1,1);(2,0)];
+	skill_type = "Radius";
+	range = [(3,1)];
 	dmg = -4;
 	cost = 3;
 }
@@ -305,13 +310,21 @@ let draw_UI_main ent cursor score=
 
 
 
-let draw_skill_range (n,v) skill map =
+(*let draw_skill_range (n,v) range map =
 	let rec aux_draw_skill_range (n,v) l =
 	match l with 
 	|[] -> []
 	|(x,y)::q -> begin if (v+y>=0 && v+y<=24) && (n+x>=0 && n+x<=24) then if map.(v+y).(n+x) = Vide then putpixel blanc (n+x) (v+y); aux_draw_skill_range (n,v) q end
 in
-	ignore (aux_draw_skill_range (n,v) skill.range)
+	ignore (aux_draw_skill_range (n,v) range)*)
+
+let draw_range range map =
+	let rec aux_draw_range l =
+	match l with 
+	|[] -> []
+	|(x,y)::q -> begin if (y>=0 && y<=24) && (x>=0 && x<=24) then if map.(y).(x) = Vide then putpixel blanc (x) (y); aux_draw_range q end
+in
+	ignore (aux_draw_range range)
 
 
 let draw_UI_Attaques ent =
@@ -338,6 +351,7 @@ let unwrap_skill s =
 	| Existe x -> x
 	| Nulle -> {name = "";
 				description = "";
+				skill_type = "";
 				range = [];
 				dmg = 0;
 				cost = 0}
@@ -368,23 +382,44 @@ let take_dmg ent dmg map score =
 	ent.hp <- ent.hp - dmg;
 	if ent.hp <= 0 then begin map.(ent.y).(ent.x) <- Vide; score:= !score + 1 end
 
+let rec add_range r ent=
+	match r with
+	| [] -> []
+	| (x,y)::q -> (x+ent.x,y+ent.y)::(add_range q ent)
+
 let skill_range_circle ent s map=
-	let rec aux x y range visited =
+	let rec aux x y range visited hit_self =
 		if map.(y).(x) = Vide || !visited = [] then begin
-			visited := (x,y)::(!visited);
+			if hit_self || map.(y).(x) <> Vide then visited := (x,y)::(!visited);
 			if range > 0 then  begin
-				aux (x+1) y (range-1) visited;
-				aux (x-1) y (range-1) visited;
-				aux x (y+1) (range-1) visited;
-				aux x (y-1) (range-1) visited;
+				aux (x+1) y (range-1) visited hit_self;
+				aux (x-1) y (range-1) visited hit_self;
+				aux x (y+1) (range-1) visited hit_self;
+				aux x (y-1) (range-1) visited hit_self;
 			end;
 		end;
 	in
 	let range = ref [] in
+	(* Gros bidouillage ici pour avoir un range exprime en int*int list *)
 	match s.range with
 	| [] -> [];
-	| (x,y)::q -> if q=q && y=y then aux ent.x ent.y x range;
+	| (x,y)::q -> if q=q && y=y then aux ent.x ent.y x range (y<>0);
 	!range
+
+let skill_range_ray ent s map=
+	let rec add_coords x y l=
+		match l with
+		| [] -> []
+		| (x1,y1)::q -> (x+x1,y+y1)::(add_coords x y q)
+	in
+	let rec search_list l =
+	match l with
+	| [] -> []
+	| (x,y)::q -> if (x>=0 && x<=24) && (y>=0 && y<=24) then 
+					if map.(y).(x) <> Mur && map.(y).(x) <> Bord then (x,y)::(search_list q) else [(x,y)]
+				  else search_list q
+	in
+	search_list (add_coords ent.x ent.y s.range)
 
 (* Rotation de la visée d'un skill*)
 let rotate_skill s =
@@ -401,14 +436,15 @@ let use_skill ent s map score =
 	let rec use_skill_aux dmg range =
 		match range with
 		| [] -> ()
-		| (x,y)::q -> match map.(ent.y+y).(ent.x+x) with
+		| (x,y)::q -> match map.(y).(x) with
 					  | Ennemi e -> begin take_dmg e dmg map score; use_skill_aux dmg q end
 					  | Allie a -> begin take_dmg a dmg map score; use_skill_aux dmg q end
 					  | _ -> use_skill_aux dmg q;
 	in 
 	let move = unwrap_skill s in
-	if move = blast_skill then use_skill_aux move.dmg (skill_range_circle ent move map)
-	else use_skill_aux move.dmg move.range;
+	if move.skill_type = "Radius" then use_skill_aux move.dmg (skill_range_circle ent move map)
+	else if move.skill_type = "Ray" then use_skill_aux move.dmg (skill_range_ray ent move map)
+	else if move.skill_type = "Other" then use_skill_aux move.dmg (add_range move.range ent);
 	ent.mp <- ent.mp - move.cost
 
 let activate_skill ent skill_sel atk_ready map score=
@@ -419,7 +455,7 @@ let activate_skill ent skill_sel atk_ready map score=
 		atk_ready := false;
 	end
 	
-let  rec enemies_turn enemies map score =
+let rec enemies_turn enemies map score =
 	let enemy_turn e target=
 		for i=1 to 3 do
 			e.moves <- e.moves + 1;
@@ -517,7 +553,9 @@ Random.self_init ();
 		if !attack_ready then begin 
 			draw_UI_Attaques !a;
 			match (find_skill !a !skill_selected) with
-			| Existe s -> draw_skill_range (!a.x,!a.y) s m;
+			| Existe s -> if s.skill_type = "Radius" then draw_range (skill_range_circle !a s m) m 
+						  else if  s.skill_type = "Ray" then draw_range (skill_range_ray !a s m) m
+						  else if  s.skill_type = "Other" then draw_range (add_range s.range !a) m
 			| Nulle -> skill_selected := 0;
 		end
 		else if !a.moves = 0 then draw_UI_main !a 1 score;

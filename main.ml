@@ -103,8 +103,8 @@ let blast_skill = {
 	description = "Attaque autour du personnage (Portee: 3)";
 	skill_type = "Radius";
 	range = [(3,0)];
-	dmg = 4;
-	cost = 3;
+	dmg = 8;
+	cost = 5;
 }
 
 let ray_skill = {
@@ -113,7 +113,7 @@ let ray_skill = {
 	skill_type = "Ray";
 	range = [(1,0);(2,0);(3,0);(4,0);(5,0)];
 	dmg = 5;
-	cost = 4;
+	cost = 3;
 }
 
 let slash_skill = {
@@ -121,13 +121,13 @@ let slash_skill = {
 	description = "Coup devant le personnage de la droite vers la gauche (Portee: 1)";
 	skill_type = "Ray";
 	range = [(1,1);(1,0);(1,-1)];
-	dmg = 6;
+	dmg = 4;
 	cost = 0;
 }
 
 let healAura_skill = {
 	name = "Aura de Soin";
-	description = "Soin autour du personnage (Portee: 3)";
+	description = "Soin autour du personnage, permet d'avoir un bouclier en cas de depassement (Portee: 3)";
 	skill_type = "Radius";
 	range = [(3,1)];
 	dmg = -4;

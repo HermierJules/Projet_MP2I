@@ -471,17 +471,17 @@ Random.self_init ();
     let h = match get_size ()with (x,_) -> x in
     let continue = ref true in
     let frames = ref 0 in
+    let turn = ref  0 in
 
     let m = mapofstring cases in
 	m.(mage.y).(mage.x) <- Allie mage;
 	m.(warrior.y).(warrior.x) <- Allie warrior;
-	m.(e1.y).(e1.x) <- Ennemi e1;
-	m.(e2.y).(e2.x) <- Ennemi e2;
-	m.(e3.y).(e3.x) <- Ennemi e3;
 	generate_walls m;
 	let attack_ready = ref false and skill_selected = ref 0 in
 	let a = ref mage in
-	let all_enemies = ref [e1;e2;e3] in
+	let all_enemies = ref [] in
+	all_enemies := ennemy_spawn m all_enemies;
+	all_enemies := ennemy_spawn m all_enemies;
 	all_enemies := ennemy_spawn m all_enemies;
     (* boucle principale *)
     while !continue do
@@ -567,7 +567,7 @@ Random.self_init ();
 						end
 				| 'r' -> if !skill_selected > 0 then rotate_skill (unwrap_skill (find_skill !a !skill_selected))
 				| 's' -> if !a = mage then a:=warrior else a:=mage;
-				| 'f' -> mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn !all_enemies m score
+				| 'f' -> mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn !all_enemies m score; incr turn; if !turn mod 3 = 0 then 	all_enemies := ennemy_spawn m all_enemies;
                 | _ -> ())
         end
     done;

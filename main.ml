@@ -310,13 +310,14 @@ let draw_UI_main ent cursor score=
 
 
 
-(*let draw_skill_range (n,v) range map =
-	let rec aux_draw_skill_range (n,v) l =
-	match l with 
-	|[] -> []
-	|(x,y)::q -> begin if (v+y>=0 && v+y<=24) && (n+x>=0 && n+x<=24) then if map.(v+y).(n+x) = Vide then putpixel blanc (n+x) (v+y); aux_draw_skill_range (n,v) q end
-in
-	ignore (aux_draw_skill_range (n,v) range)*)
+let heal m = 
+	for y = 0 to 24 do
+	   for x = 0 to 24 do
+	   	match m.(y).(x) with
+	   	|Allie x -> x.hp <- (x.hp + 5); x.mp <- (x.mp + 5); if x.hp > x.hpmax then x.hp <- x.hpmax; if x.mp > x.mpmax then x.mp <- x.mpmax
+	   	|_ -> ()
+	done
+done
 
 let draw_range range map =
 	let rec aux_draw_range l =
@@ -333,7 +334,8 @@ let draw_UI_Attaques ent =
 	|Nulle -> ignore (mvaddstr x y (Printf.sprintf "" ));
 	|Existe s ->begin
 			    ignore (mvaddstr x y (Printf.sprintf "%c : %s" letter s.name));
-			    ignore(mvaddstr (x+2) (y+1) (Printf.sprintf "%s" s.description ))
+			    ignore(mvaddstr (x+2) (y+1) (Printf.sprintf "%s" s.description ));
+			    ignore(mvaddstr (x+3) (y+1) (Printf.sprintf "Coût: %d mp" s.cost ))
 			end
 			in
 	match ent.skills with
@@ -380,7 +382,7 @@ let find_skill ent n =
 
 let take_dmg ent dmg map score = 
 	ent.hp <- ent.hp - dmg;
-	if ent.hp <= 0 then begin map.(ent.y).(ent.x) <- Vide; score:= !score + 1 end
+	if ent.hp <= 0 then begin map.(ent.y).(ent.x) <- Vide; score:= !score + 1; heal map end
 
 let rec add_range r ent=
 	match r with
@@ -526,17 +528,17 @@ Random.self_init ();
     let h = match get_size ()with (x,_) -> x in
     let continue = ref true in
     let frames = ref 0 in
+    let turn = ref  0 in
 
     let m = mapofstring cases in
 	m.(mage.y).(mage.x) <- Allie mage;
 	m.(warrior.y).(warrior.x) <- Allie warrior;
-	m.(e1.y).(e1.x) <- Ennemi e1;
-	m.(e2.y).(e2.x) <- Ennemi e2;
-	m.(e3.y).(e3.x) <- Ennemi e3;
 	generate_walls m;
 	let attack_ready = ref false and skill_selected = ref 0 in
 	let a = ref mage in
-	let all_enemies = ref [e1;e2;e3] in
+	let all_enemies = ref [] in
+	all_enemies := ennemy_spawn m all_enemies;
+	all_enemies := ennemy_spawn m all_enemies;
 	all_enemies := ennemy_spawn m all_enemies;
     (* boucle principale *)
     while !continue do
@@ -624,7 +626,7 @@ Random.self_init ();
 						end
 				| 'r' -> if !skill_selected > 0 then rotate_skill (unwrap_skill (find_skill !a !skill_selected))
 				| 's' -> if !a = mage then a:=warrior else a:=mage;
-				| 'f' -> mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn !all_enemies m score
+				| 'f' -> mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn !all_enemies m score; incr turn; if !turn mod 3 = 0 then 	all_enemies := ennemy_spawn m all_enemies;
                 | _ -> ())
         end
     done;

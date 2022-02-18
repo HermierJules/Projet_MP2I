@@ -652,8 +652,8 @@ Random.self_init ();
 							else skill_selected := 4;
 						end
 				| 'r' -> if not !lose then if !skill_selected > 0 then rotate_skill (unwrap_skill (find_skill !a !skill_selected))
-				| 's' -> if !a = mage && not warrior.dead then a:=warrior else if !a = warrior && not mage.dead then a:=mage;
-				| 'f' -> if (!a.moves = 0 && not !lose) && not !attack_ready then begin
+				| 's' -> if not !attack_ready then if !a = mage && not warrior.dead then a:=warrior else if !a = warrior && not mage.dead then a:=mage;
+				| 'f' -> if (!a.moves = 0 && not !lose) then begin
 							mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn !all_enemies m score; incr turn; 
 							if !turn mod 3 = 0 then begin all_enemies := ennemy_spawn m all_enemies; all_enemies := ennemy_spawn m all_enemies end
 						end

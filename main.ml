@@ -22,6 +22,7 @@ type entite = {
 	mutable moves: int;
 	mutable can_move: bool;
 	mutable can_attack: bool;
+	mutable dead : bool;
 }
 
 type tile = Bord | Mur | Vide | Allie of entite | Ennemi of entite 
@@ -99,7 +100,7 @@ let _ =
 
 let blast_skill = {
 	name = "Explosion";
-	description = "Attaque autour du personnage (Portee: 2)";
+	description = "Attaque autour du personnage (Portee: 3)";
 	skill_type = "Radius";
 	range = [(3,0)];
 	dmg = 4;
@@ -126,7 +127,7 @@ let slash_skill = {
 
 let healAura_skill = {
 	name = "Aura de Soin";
-	description = "Soin autour du personnage (Portee: 2)";
+	description = "Soin autour du personnage (Portee: 3)";
 	skill_type = "Radius";
 	range = [(3,1)];
 	dmg = -4;
@@ -144,6 +145,7 @@ let mage = {
 	moves = 0;
 	can_move = true;
 	can_attack = true;
+	dead = false;
 }
 
 let warrior = {
@@ -157,6 +159,7 @@ let warrior = {
 	moves = 0;
 	can_move = true;
 	can_attack = true;
+	dead = false;
 }
 
 let e1 = {
@@ -170,6 +173,7 @@ let e1 = {
 	moves = 3;
 	can_move = true;
 	can_attack = true;
+	dead = false;
 }
 
 let e2 = {
@@ -183,6 +187,7 @@ let e2 = {
 	moves = 3;
 	can_move = true;
 	can_attack = true;
+	dead = false;
 }
 
 let e3 = {
@@ -196,6 +201,7 @@ let e3 = {
 	moves = 3;
 	can_move = true;
 	can_attack = true;
+	dead = false;
 }
 
 (*définitions des couleurs*)
@@ -296,17 +302,27 @@ done
 (*let's draw the UI*)
 
 
-let draw_UI_main ent cursor score=
-	couleur blanc noir;
+let draw_UI_main ent cursor score solo=
+	couleur rouge noir;
+    ignore (mvaddstr 3 40 (Printf.sprintf "Score: %d" !score));
+	couleur vert noir;
     ignore (mvaddstr 5 30 (Printf.sprintf "HP: %d/%d" ent.hp ent.hpmax));
-    ignore (mvaddstr 0 30 (Printf.sprintf "Score: %d" !score));
+	couleur bleu noir;
     ignore (mvaddstr 5 50 (Printf.sprintf "MP: %d/%d" ent.mp ent.mpmax));
+	couleur blanc noir;
     ignore (mvaddstr 10 35 (Printf.sprintf "Que faire ? :"));
     if ent.can_move then ignore (mvaddstr 15 30 (Printf.sprintf "D : Se deplacer"));
     if ent.can_attack then ignore (mvaddstr 18 30 (Printf.sprintf "A : Attaquer"));
-    ignore (mvaddstr 21 30 (Printf.sprintf "S : Changer de personnage"));
+    if not solo then ignore (mvaddstr 21 30 (Printf.sprintf "S : Changer de personnage"));
     ignore (mvaddstr 25 30 (Printf.sprintf "F : Finir le tour"));
     if cursor = 1 then putpixel rouge_clair 3 45 else putpixel rouge_clair 3 50
+	
+	
+let draw_UI_Defeat score=
+	couleur rouge noir;
+    ignore (mvaddstr 10 40 (Printf.sprintf "GAME OVER" ));
+	couleur vert noir;
+    ignore (mvaddstr 12 34 (Printf.sprintf "Votre score est : %d" !score))
 
 
 
@@ -321,11 +337,11 @@ done
 
 let draw_range range map =
 	let rec aux_draw_range l =
-	match l with 
-	|[] -> []
-	|(x,y)::q -> begin if (y>=0 && y<=24) && (x>=0 && x<=24) then if map.(y).(x) = Vide then putpixel blanc (x) (y); aux_draw_range q end
-in
-	ignore (aux_draw_range range)
+		match l with 
+		|[] -> ()
+		|(x,y)::q -> begin if (y>=0 && y<=24) && (x>=0 && x<=24) then if map.(y).(x) = Vide then putpixel blanc (x) (y); aux_draw_range q end
+	in
+	aux_draw_range range
 
 
 let draw_UI_Attaques ent =
@@ -335,7 +351,7 @@ let draw_UI_Attaques ent =
 	|Existe s ->begin
 			    ignore (mvaddstr x y (Printf.sprintf "%c : %s" letter s.name));
 			    ignore(mvaddstr (x+2) (y+1) (Printf.sprintf "%s" s.description ));
-			    ignore(mvaddstr (x+3) (y+1) (Printf.sprintf "Coût: %d mp" s.cost ))
+			    ignore(mvaddstr (x+3) (y+1) (Printf.sprintf "Cout: %d MP" s.cost ))
 			end
 			in
 	match ent.skills with
@@ -382,7 +398,7 @@ let find_skill ent n =
 
 let take_dmg ent dmg map score = 
 	ent.hp <- ent.hp - dmg;
-	if ent.hp <= 0 then begin map.(ent.y).(ent.x) <- Vide; score:= !score + 1; heal map end
+	if ent.hp <= 0 then begin map.(ent.y).(ent.x) <- Vide; ent.dead <- true; score:= !score + 1; heal map end
 
 let rec add_range r ent=
 	match r with
@@ -392,8 +408,9 @@ let rec add_range r ent=
 let skill_range_circle ent s map=
 	let rec aux x y range visited hit_self =
 		if map.(y).(x) = Vide || !visited = [] then begin
-			if hit_self || map.(y).(x) <> Vide then visited := (x,y)::(!visited);
-			if range > 0 then  begin
+			if hit_self then visited := (x,y)::(!visited)
+			else if map.(y).(x) = Vide then visited := (x,y)::(!visited);
+			if range > 0 then begin
 				aux (x+1) y (range-1) visited hit_self;
 				aux (x-1) y (range-1) visited hit_self;
 				aux x (y+1) (range-1) visited hit_self;
@@ -484,39 +501,41 @@ let rec enemies_turn enemies map score =
 	in
 	match enemies with
 	|[] -> ()
-	|t::q->  if (dist t.x t.y mage.x mage.y) < (dist t.x t.y warrior.x warrior.y) then begin enemy_turn t mage; enemies_turn q map score end
-		else begin enemy_turn t warrior; enemies_turn q map score end
+	|t::q-> if not t.dead then
+				if (dist t.x t.y mage.x mage.y) < (dist t.x t.y warrior.x warrior.y) || warrior.dead then begin enemy_turn t mage; enemies_turn q map score end
+				else if (dist t.x t.y mage.x mage.y) >= (dist t.x t.y warrior.x warrior.y) || mage.dead then begin enemy_turn t warrior; enemies_turn q map score end
 
 
 let ennemy_spawn m l = 
-Random.self_init ();
-let e = {
-	hpmax = 10;
-	mpmax = 5;
-    hp = 10;
-    mp = 5;
-    x = 21;
-	y = 12;
-    skills= (Existe slash_skill,Existe blast_skill,Existe ray_skill,Existe healAura_skill);
-	moves = 3;
-	can_move = true;
-	can_attack = true;
-}
-in
-let x = ref 0 in
-let y = ref 0 in
-let check = ref true in
-while !check do
-	x:= Random.int 24;
-	y:= Random.int 24;
-	if m.(!y).(!x) = Vide then begin
-										e.x <- !x;
-										e.y <- !y;
-										 m.(!y).(!x) <- Ennemi e; 
-										 l:= e::!l; check:= false 
-													end
-done;
-!l
+	Random.self_init ();
+	let e = {
+		hpmax = 10;
+		mpmax = 5;
+		hp = 10;
+		mp = 5;
+		x = 21;
+		y = 12;
+		skills= (Existe slash_skill,Existe blast_skill,Existe ray_skill,Existe healAura_skill);
+		moves = 3;
+		can_move = true;
+		can_attack = true;
+		dead = false;
+	}
+	in
+	let x = ref 0 in
+	let y = ref 0 in
+	let check = ref true in
+	while !check do
+		x:= Random.int 24;
+		y:= Random.int 24;
+		if m.(!y).(!x) = Vide then begin
+											e.x <- !x;
+											e.y <- !y;
+											 m.(!y).(!x) <- Ennemi e; 
+											 l:= e::!l; check:= false 
+														end
+	done;
+	!l
 
 
 
@@ -540,6 +559,7 @@ Random.self_init ();
 	all_enemies := ennemy_spawn m all_enemies;
 	all_enemies := ennemy_spawn m all_enemies;
 	all_enemies := ennemy_spawn m all_enemies;
+	let one_dead = ref false and lose = ref false in
     (* boucle principale *)
     while !continue do
         (* le clear permet de ne pas avoir de problèmes avec les animations
@@ -549,10 +569,14 @@ Random.self_init ();
         couleur rouge noir;
 		
         draw_board m h;
-		putpixel bleu !a.x !a.y;
+		
+		if (mage.dead && not warrior.dead) then begin one_dead := true; a:= warrior end
+		else if warrior.dead && not mage.dead then begin one_dead := true; a:= mage end
+		else if mage.dead && warrior.dead then lose := true;
 		
 		couleur blanc noir;
-		if !attack_ready then begin 
+		if !lose then draw_UI_Defeat score
+		else if !attack_ready then begin 
 			draw_UI_Attaques !a;
 			match (find_skill !a !skill_selected) with
 			| Existe s -> if s.skill_type = "Radius" then draw_range (skill_range_circle !a s m) m 
@@ -560,7 +584,9 @@ Random.self_init ();
 						  else if  s.skill_type = "Other" then draw_range (add_range s.range !a) m
 			| Nulle -> skill_selected := 0;
 		end
-		else if !a.moves = 0 then draw_UI_main !a 1 score;
+		else if !a.moves = 0 then draw_UI_main !a 1 score !one_dead;
+		
+		if not !lose then putpixel bleu !a.x !a.y;
 
         incr frames;
 
@@ -570,21 +596,22 @@ Random.self_init ();
         assert(refresh ());
 
         (* on regarde si on a appuyé sur une touche *)
-        let c = getch () in
-        if c >= 0
-        then begin
-            (* c'est le cas on fait une action en conséquence *)
-            (* attention certaines touches sont spéciales et ne
-               peuvent pas être converties en caractère comme les
-               touches fléchées *)
-            if c = Key.down then move_entite m !a 0 1
-            else if c = Key.up then move_entite m !a 0 (-1)
-            else if c = Key.left then move_entite m !a (-1) 0 
-            else if c = Key.right then move_entite m !a 1 0
-            else (match char_of_int c with
-                (* des caractères normaux *)
-                | 'q' -> continue := false
-				| 'd' -> if !a.moves > 0 then begin 
+		let c = getch () in
+		if c >= 0
+		then begin
+			(* c'est le cas on fait une action en conséquence *)
+			(* attention certaines touches sont spéciales et ne
+			   peuvent pas être converties en caractère comme les
+			   touches fléchées *)
+			if c = Key.down then move_entite m !a 0 1
+			else if c = Key.up then move_entite m !a 0 (-1)
+			else if c = Key.left then move_entite m !a (-1) 0 
+			else if c = Key.right then move_entite m !a 1 0
+			else (match char_of_int c with
+				(* des caractères normaux *)
+				| 'q' -> continue := false
+				| 'd' -> if not !lose then 
+						if !a.moves > 0 then begin 
 							!a.moves <- 0;
 							!a.can_move <- false
 						end
@@ -592,7 +619,7 @@ Random.self_init ();
 							!a.moves <- 5;
 							!a.can_move <- false 
 						end
-				| 'a' -> if !a.moves=0 && !a.can_attack then attack_ready := true;
+				| 'a' -> if not !lose then if !a.moves=0 && !a.can_attack then attack_ready := true;
 				| 'u' -> if !attack_ready then begin
 							if !skill_selected = 1 then activate_skill a skill_selected attack_ready m score
 							else skill_selected := 1;
@@ -624,11 +651,14 @@ Random.self_init ();
 							end
 							else skill_selected := 4;
 						end
-				| 'r' -> if !skill_selected > 0 then rotate_skill (unwrap_skill (find_skill !a !skill_selected))
-				| 's' -> if !a = mage then a:=warrior else a:=mage;
-				| 'f' -> mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn !all_enemies m score; incr turn; if !turn mod 3 = 0 then 	all_enemies := ennemy_spawn m all_enemies;
-                | _ -> ())
-        end
+				| 'r' -> if not !lose then if !skill_selected > 0 then rotate_skill (unwrap_skill (find_skill !a !skill_selected))
+				| 's' -> if !a = mage && not warrior.dead then a:=warrior else if !a = warrior && not mage.dead then a:=mage;
+				| 'f' -> if !a.moves = 0 && not !lose then begin
+							mage.can_move <- true; mage.can_attack <- true; warrior.can_move <- true; warrior.can_attack <- true; enemies_turn !all_enemies m score; incr turn; 
+							if !turn mod 3 = 0 then all_enemies := ennemy_spawn m all_enemies; 
+						end
+				| _ -> ())
+		end
     done;
 
     endwin ();

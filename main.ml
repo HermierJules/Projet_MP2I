@@ -562,9 +562,6 @@ Random.self_init ();
 	let one_dead = ref false and lose = ref false in
     (* boucle principale *)
     while !continue do
-        (* le clear permet de ne pas avoir de problèmes avec les animations
-           mais c'est lent. Dans beaucoup d'application il vaut mieux
-           réecrire par dessus ce qui a changé *)
         clear ();
         couleur rouge noir;
 		

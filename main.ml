@@ -211,8 +211,8 @@ let gris_fonce = noir+1
 let gris = gris_fonce+1
 let blanc = gris+1
 let rouge = blanc+1
-let rouge_clair = rouge+1
-let vert = rouge_clair+1
+let orange = rouge+1
+let vert = orange+1
 let vert_clair = vert+1
 let bleu = vert_clair+1
 let bleu_clair = bleu+1
@@ -224,6 +224,7 @@ let cree_couleurs () =
     assert(init_color gris 500 500 500);
     assert(init_color blanc 1000 1000 1000);
     assert(init_color rouge 1000 0 0);
+    assert(init_color orange 1000 500 0);
     assert(init_color vert 0 1000 0);
     assert(init_color vert_clair 500 1000 500);
     assert(init_color bleu 0 0 1000);
@@ -315,7 +316,7 @@ let draw_UI_main ent cursor score solo=
     if ent.can_attack then ignore (mvaddstr 18 30 (Printf.sprintf "A : Attaquer"));
     if not solo then ignore (mvaddstr 21 30 (Printf.sprintf "S : Changer de personnage"));
     ignore (mvaddstr 25 30 (Printf.sprintf "F : Finir le tour"));
-    if cursor = 1 then putpixel rouge_clair 3 45 else putpixel rouge_clair 3 50
+    if cursor = 1 then putpixel orange 3 45 else putpixel orange 3 50
 	
 	
 let draw_UI_Defeat score=
@@ -330,7 +331,7 @@ let heal m =
 	for y = 0 to 24 do
 	   for x = 0 to 24 do
 	   	match m.(y).(x) with
-	   	|Allie x -> x.hp <- (x.hp + 5); x.mp <- (x.mp + 5); if x.hp > x.hpmax then x.hp <- x.hpmax; if x.mp > x.mpmax then x.mp <- x.mpmax
+	   	|Allie x -> x.hp <- (x.hp + 5); x.mp <- (x.mp + 3); if x.hp > x.hpmax then x.hp <- x.hpmax; if x.mp > x.mpmax then x.mp <- x.mpmax
 	   	|_ -> ()
 	done
 done
@@ -339,7 +340,11 @@ let draw_range range map =
 	let rec aux_draw_range l =
 		match l with 
 		|[] -> ()
-		|(x,y)::q -> begin if (y>=0 && y<=24) && (x>=0 && x<=24) then if map.(y).(x) = Vide then putpixel blanc (x) (y); aux_draw_range q end
+		|(x,y)::q -> if (y>=0 && y<=24) && (x>=0 && x<=24) then 
+						match map.(y).(x) with
+						| Vide -> begin putpixel blanc (x) (y); aux_draw_range q end
+						| Ennemi _ -> begin putpixel orange (x) (y); aux_draw_range q end
+						| _ -> aux_draw_range q
 	in
 	aux_draw_range range
 
@@ -407,22 +412,25 @@ let rec add_range r ent=
 
 let skill_range_circle ent s map=
 	let rec aux x y range visited hit_self =
-		if map.(y).(x) = Vide || !visited = [] then begin
-			if hit_self then visited := (x,y)::(!visited)
-			else if map.(y).(x) = Vide then visited := (x,y)::(!visited);
-			if range > 0 then begin
-				aux (x+1) y (range-1) visited hit_self;
-				aux (x-1) y (range-1) visited hit_self;
-				aux x (y+1) (range-1) visited hit_self;
-				aux x (y-1) (range-1) visited hit_self;
-			end;
+		let continue = ref true in
+		begin match map.(y).(x) with
+		| Vide -> visited := (x,y)::(!visited)
+		| Ennemi e -> if e<>ent then visited := (x,y)::(!visited) else if hit_self then visited := (x,y)::(!visited)
+		| Allie a -> if a<>ent then visited := (x,y)::(!visited) else if hit_self then visited := (x,y)::(!visited)
+		| _ -> continue := false 
+		end;
+		if range > 0 && !continue then begin
+			aux (x+1) y (range-1) visited hit_self;
+			aux (x-1) y (range-1) visited hit_self;
+			aux x (y+1) (range-1) visited hit_self;
+			aux x (y-1) (range-1) visited hit_self;
 		end;
 	in
 	let range = ref [] in
 	(* Gros bidouillage ici pour avoir un range exprime en int*int list *)
 	match s.range with
 	| [] -> [];
-	| (x,y)::q -> if q=q && y=y then aux ent.x ent.y x range (y<>0);
+	| (x,y)::q -> if q=q then aux ent.x ent.y x range (y<>0);
 	!range
 
 let skill_range_ray ent s map=
@@ -622,30 +630,15 @@ Random.self_init ();
 							else skill_selected := 1;
 						end
 				| 'i' -> if !attack_ready then begin
-							if !skill_selected = 2 then begin
-								use_skill !a (find_skill !a !skill_selected) m score;
-								skill_selected := 0;
-								!a.can_attack <- false;
-								attack_ready := false;
-							end
+							if !skill_selected = 2 then activate_skill a skill_selected attack_ready m score
 							else skill_selected := 2;
 						end
 				| 'o' -> if !attack_ready then begin
-							if !skill_selected = 3 then begin
-								use_skill !a (find_skill !a !skill_selected) m score;
-								skill_selected := 0;
-								!a.can_attack <- false;
-								attack_ready := false;
-							end
+							if !skill_selected = 3 then activate_skill a skill_selected attack_ready m score
 							else skill_selected := 3;
 						end
 				| 'p' -> if !attack_ready then begin
-							if !skill_selected = 4 then begin
-								use_skill !a (find_skill !a !skill_selected) m score;
-								skill_selected := 0;
-								!a.can_attack <- false;
-								attack_ready := false;
-							end
+							if !skill_selected = 4 then activate_skill a skill_selected attack_ready m score
 							else skill_selected := 4;
 						end
 				| 'r' -> if not !lose then if !skill_selected > 0 then rotate_skill (unwrap_skill (find_skill !a !skill_selected))
